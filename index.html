@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWS Icon Guessing Game - Cyberpunk Edition</title>
+  <style>
+    :root {
+      --neon-pink: #ff0080;
+      --neon-blue: #00c3ff;
+      --neon-green: #00ff80;
+      --neon-yellow: #ffff00;
+      --dark-purple: #190033;
+      --dark-blue: #050a14;
+      --black: #0a0a0f;
+      --gray: #32323c;
+      --light-gray: #646478;
+      --white: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Arial', 'Segoe UI', sans-serif;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--black);
+      color: var(--white);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Cyberpunk Grid Background */
+    .bg-grid {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-image: 
+        linear-gradient(rgba(0, 195, 255, 0.15) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 195, 255, 0.15) 1px, transparent 1px);
+      background-size: 30px 30px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Random Glitch Overlay */
+    .glitch-bar {
+      position: fixed;
+      background: var(--neon-pink);
+      height: 4px;
+      opacity: 0.8;
+      pointer-events: none;
+      z-index: 100;
+      display: none;
+    }
+
+    .main-container {
+      position: relative;
+      z-index: 10;
+      width: 800px;
+      max-width: 95vw;
+      min-height: 600px;
+      background: var(--dark-blue);
+      border: 2px solid var(--neon-blue);
+      box-shadow: 0 0 20px rgba(0, 195, 255, 0.3);
+      padding: 30px 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Cyberpunk Card Corner Cuts */
+    .corner-dec {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-color: var(--neon-pink);
+      border-style: solid;
+      pointer-events: none;
+    }
+    .corner-tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; }
+    .corner-tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; }
+    .corner-bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; }
+    .corner-br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
+
+    /* Typography & Glows */
+    h1 {
+      font-size: 2.2rem;
+      color: var(--neon-pink);
+      text-shadow: 0 0 10px var(--neon-pink), 0 0 20px rgba(255, 0, 128, 0.5);
+      letter-spacing: 2px;
+      text-align: center;
+      margin-bottom: 4px;
+    }
+
+    h2 {
+      font-size: 1.4rem;
+      color: var(--neon-blue);
+      text-shadow: 0 0 8px var(--neon-blue);
+      letter-spacing: 1.5px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .screen {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Buttons */
+    .btn-cyber {
+      background: var(--neon-pink);
+      color: var(--black);
+      border: 2px solid var(--neon-blue);
+      padding: 14px 28px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+
+    .btn-cyber:hover {
+      background: #ff3296;
+      box-shadow: 0 0 12px var(--neon-blue);
+      transform: translateY(-2px);
+    }
+
+    .btn-cyber.secondary {
+      background: var(--dark-blue);
+      color: var(--neon-green);
+      border-color: var(--neon-green);
+    }
+
+    .btn-cyber.secondary:hover {
+      background: var(--gray);
+      box-shadow: 0 0 12px var(--neon-green);
+    }
+
+    /* Question Screen */
+    .progress-bar-wrap {
+      width: 400px;
+      max-width: 80%;
+      height: 10px;
+      border: 1px solid var(--neon-blue);
+      background: var(--black);
+      margin: 10px 0 20px 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--neon-pink);
+      box-shadow: 0 0 8px var(--neon-pink);
+      transition: width 0.3s ease;
+    }
+
+    /* Icon reveal container */
+    .icon-container {
+      width: 128px;
+      height: 128px;
+      background: var(--white);
+      border: 2px solid var(--neon-blue);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 24px;
+      box-shadow: 0 0 15px rgba(0, 195, 255, 0.4);
+    }
+
+    .icon-container img {
+      width: 128px;
+      height: 128px;
+      object-fit: contain;
+      display: block;
+    }
+
+    .icon-curtain {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--black);
+      pointer-events: none;
+    }
+
+    .options-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 380px;
+      max-width: 100%;
+    }
+
+    .btn-option {
+      background: var(--dark-blue);
+      color: var(--neon-green);
+      border: 2px solid var(--neon-green);
+      padding: 10px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+
+    .btn-option:hover {
+      background: var(--gray);
+      color: var(--white);
+      box-shadow: 0 0 10px var(--neon-green);
+    }
+
+    /* Results */
+    .badge {
+      border: 2px solid;
+      padding: 10px 30px;
+      font-size: 1.8rem;
+      font-weight: bold;
+      margin: 15px 0 20px 0;
+      letter-spacing: 2px;
+      text-align: center;
+      background: rgba(0,0,0,0.5);
+    }
+
+    .score-info {
+      color: var(--neon-yellow);
+      font-size: 1.15rem;
+      margin: 6px 0;
+      letter-spacing: 1px;
+    }
+
+    /* Review Screen */
+    .review-desc {
+      color: var(--neon-green);
+      font-size: 1.05rem;
+      max-width: 550px;
+      text-align: center;
+      line-height: 1.5;
+      margin: 15px 0;
+    }
+
+    .review-user-ans {
+      font-size: 1.15rem;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .footer {
+      font-size: 0.75rem;
+      color: var(--neon-yellow);
+      margin-top: 15px;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div id="glitch" class="glitch-bar"></div>
+
+  <div class="main-container">
+    <div class="corner-dec corner-tl"></div>
+    <div class="corner-dec corner-tr"></div>
+    <div class="corner-dec corner-bl"></div>
+    <div class="corner-dec corner-br"></div>
+
+    <!-- START SCREEN -->
+    <div id="screen-start" class="screen">
+      <h1>AWS ICON GUESSING GAME</h1>
+      <h2>CYBERPUNK EDITION</h2>
+
+      <div style="background: rgba(5,10,20,0.8); border: 1px solid var(--neon-blue); padding: 24px 30px; max-width: 560px; margin-bottom: 25px;">
+        <p style="color: var(--neon-green); font-weight: bold; font-size: 1.1rem; text-align: center; margin-bottom: 15px;">
+          TEST YOUR KNOWLEDGE OF AWS SERVICES
+        </p>
+        <ul style="color: var(--neon-blue); list-style: none; line-height: 1.9; font-size: 0.95rem;">
+          <li>• Icons will be revealed from top to bottom</li>
+          <li>• Choose the correct service name from 4 options</li>
+          <li>• 10 questions total from 30 AWS services</li>
+          <li>• See your AWS knowledge level at the end</li>
+        </ul>
+      </div>
+
+      <button class="btn-cyber" onclick="startGame()">START GAME</button>
+      <div class="footer">© 2077 NETRUNNER SYSTEMS</div>
+    </div>
+
+    <!-- PLAYING SCREEN -->
+    <div id="screen-play" class="screen hidden">
+      <h2 id="q-header" style="color: var(--neon-yellow); margin-bottom: 5px;">QUESTION 1/10</h2>
+      
+      <div class="progress-bar-wrap">
+        <div id="progress-bar" class="progress-bar-fill"></div>
+      </div>
+
+      <div class="icon-container">
+        <img id="quiz-icon" src="" alt="AWS Icon">
+        <div id="icon-curtain" class="icon-curtain"></div>
+      </div>
+
+      <div class="options-container" id="options-wrap"></div>
+    </div>
+
+    <!-- RESULT SCREEN -->
+    <div id="screen-result" class="screen hidden">
+      <h1>GAME RESULTS</h1>
+      <h3 style="color: var(--neon-green); margin-top: 10px;">YOUR AWS KNOWLEDGE LEVEL</h3>
+      
+      <div id="level-badge" class="badge">AWS EXPERT</div>
+      
+      <p class="score-info" id="res-score">CORRECT ANSWERS: 10/10</p>
+      <p class="score-info" id="res-time">TOTAL TIME: 0.0 SECONDS</p>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 25px; width: 280px;">
+        <button class="btn-cyber secondary" onclick="startReview()">REVIEW ANSWERS</button>
+        <button class="btn-cyber" onclick="restartToStart()">PLAY AGAIN</button>
+      </div>
+    </div>
+
+    <!-- REVIEW SCREEN -->
+    <div id="screen-review" class="screen hidden">
+      <h2>ANSWER REVIEW</h2>
+      <p id="rev-q-num" style="color: var(--neon-yellow); font-size: 1rem;">QUESTION 1/10</p>
+      <h3 id="rev-service-name" style="color: var(--neon-pink); font-size: 1.4rem; margin: 8px 0;"></h3>
+
+      <div class="icon-container" style="box-shadow: none;">
+        <img id="rev-icon" src="" alt="Icon">
+      </div>
+
+      <p class="review-desc" id="rev-desc"></p>
+      <p class="review-user-ans" id="rev-user-ans"></p>
+      <p id="rev-correct-ans" style="color: var(--neon-green); font-size: 1.05rem; display: none;"></p>
+
+      <div class="nav-buttons">
+        <button id="btn-prev" class="btn-cyber secondary" onclick="prevReview()">PREVIOUS</button>
+        <button class="btn-cyber" onclick="backToResults()">BACK TO RESULTS</button>
+        <button id="btn-next" class="btn-cyber secondary" onclick="nextReview()">NEXT</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Pythonコードの aws_services と完全一致
+    const AWS_SERVICES = [
+      {"name": "Amazon EC2", "icon": "ec2.png", "description": "Virtual servers in the cloud"},
+      {"name": "Amazon S3", "icon": "s3.png", "description": "Scalable storage in the cloud"},
+      {"name": "Amazon RDS", "icon": "rds.png", "description": "Managed relational database service"},
+      {"name": "AWS Lambda", "icon": "lambda.png", "description": "Run code without thinking about servers"},
+      {"name": "Amazon DynamoDB", "icon": "dynamodb.png", "description": "Managed NoSQL database"},
+      {"name": "Amazon CloudWatch", "icon": "cloudwatch.png", "description": "Monitor resources and applications"},
+      {"name": "AWS IAM", "icon": "iam.png", "description": "Manage access to AWS services"},
+      {"name": "Amazon VPC", "icon": "vpc.png", "description": "Isolated cloud resources"},
+      {"name": "Amazon SNS", "icon": "sns.png", "description": "Pub/sub messaging service"},
+      {"name": "Amazon SQS", "icon": "sqs.png", "description": "Message queuing service"},
+      {"name": "AWS CloudFormation", "icon": "cloudformation.png", "description": "Create and manage resources with templates"},
+      {"name": "Amazon ECS", "icon": "ecs.png", "description": "Run containerized applications"},
+      {"name": "Amazon EKS", "icon": "eks.png", "description": "Managed Kubernetes service"},
+      {"name": "AWS Fargate", "icon": "fargate.png", "description": "Serverless compute for containers"},
+      {"name": "Amazon API Gateway", "icon": "apigateway.png", "description": "Create, publish, and manage APIs"},
+      {"name": "Amazon Route 53", "icon": "route53.png", "description": "Scalable DNS and domain registration"},
+      {"name": "AWS Elastic Beanstalk", "icon": "elasticbeanstalk.png", "description": "Deploy and scale web applications"},
+      {"name": "AWS CodePipeline", "icon": "codepipeline.png", "description": "Continuous delivery service"},
+      {"name": "AWS CodeBuild", "icon": "codebuild.png", "description": "Build and test code"},
+      {"name": "AWS CodeCommit", "icon": "codecommit.png", "description": "Store code in private Git repositories"},
+      {"name": "Amazon Athena", "icon": "athena.png", "description": "Query data in S3 using SQL"},
+      {"name": "AWS Glue", "icon": "glue.png", "description": "Prepare and load data"},
+      {"name": "Amazon Redshift", "icon": "redshift.png", "description": "Fast, simple, cost-effective data warehousing"},
+      {"name": "Amazon Aurora", "icon": "aurora.png", "description": "MySQL and PostgreSQL compatible database"},
+      {"name": "Amazon EventBridge", "icon": "eventbridge.png", "description": "Serverless event bus"},
+      {"name": "AWS Step Functions", "icon": "step-functions.png", "description": "Coordinate distributed applications"},
+      {"name": "AWS Secrets Manager", "icon": "secrets-manager.png", "description": "Rotate, manage, and retrieve secrets"},
+      {"name": "Amazon Cognito", "icon": "cognito.png", "description": "User identity and data synchronization"},
+      {"name": "Amazon GuardDuty", "icon": "guardduty.png", "description": "Intelligent threat detection"},
+      {"name": "AWS WAF", "icon": "waf.png", "description": "Filter malicious web traffic"}
+    ];
+
+    const TOTAL_QUESTIONS = 10;
+    let questions = [];
+    let userAnswers = [];
+    let currentQuestionIdx = 0;
+    let correctCount = 0;
+    let startTime = 0;
+    let totalTime = 0;
+
+    let revealInterval = null;
+    let currentRevealPercent = 0;
+
+    function shuffle(arr) {
+      return [...arr].sort(() => Math.random() - 0.5);
+    }
+
+    function switchScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
+      document.getElementById(screenId).classList.remove('hidden');
+    }
+
+    function startGame() {
+      const selected = shuffle(AWS_SERVICES).slice(0, TOTAL_QUESTIONS);
+      questions = selected.map(service => {
+        const others = AWS_SERVICES.filter(s => s.name !== service.name).map(s => s.name);
+        const wrong = shuffle(others).slice(0, 3);
+        const options = shuffle([service.name, ...wrong]);
+        return {
+          service: service,
+          options: options,
+          correctOption: options.indexOf(service.name)
+        };
+      });
+
+      userAnswers = [];
+      currentQuestionIdx = 0;
+      correctCount = 0;
+      startTime = performance.now();
+
+      switchScreen('screen-play');
+      loadQuestion();
+    }
+
+    function loadQuestion() {
+      clearInterval(revealInterval);
+
+      const q = questions[currentQuestionIdx];
+      document.getElementById('q-header').textContent = `QUESTION ${currentQuestionIdx + 1}/${TOTAL_QUESTIONS}`;
+      document.getElementById('progress-bar').style.width = `${(currentQuestionIdx / TOTAL_QUESTIONS) * 100}%`;
+
+      const quizIcon = document.getElementById('quiz-icon');
+      quizIcon.src = `icons/${q.service.icon}`;
+
+      // アイコンを上から下へ徐々に開示するアニメーション（REVEAL_STEPS再現）
+      currentRevealPercent = 100;
+      const curtain = document.getElementById('icon-curtain');
+      curtain.style.height = '100%';
+
+      revealInterval = setInterval(() => {
+        currentRevealPercent -= 2.5; // 約1.2秒かけて下まで公開
+        if (currentRevealPercent <= 0) {
+          currentRevealPercent = 0;
+          clearInterval(revealInterval);
+        }
+        curtain.style.height = `${currentRevealPercent}%`;
+      }, 30);
+
+      // 選択肢ボタン生成
+      const wrap = document.getElementById('options-wrap');
+      wrap.innerHTML = '';
+      q.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-option';
+        btn.textContent = opt;
+        btn.onclick = () => selectOption(idx);
+        wrap.appendChild(btn);
+      });
+    }
+
+    function selectOption(selectedIdx) {
+      clearInterval(revealInterval);
+
+      const q = questions[currentQuestionIdx];
+      userAnswers.push(selectedIdx);
+
+      if (selectedIdx === q.correctOption) {
+        correctCount++;
+      }
+
+      currentQuestionIdx++;
+      if (currentQuestionIdx < TOTAL_QUESTIONS) {
+        loadQuestion();
+      } else {
+        finishGame();
+      }
+    }
+
+    function finishGame() {
+      totalTime = (performance.now() - startTime) / 1000;
+      switchScreen('screen-result');
+
+      // Pythonコードの厳格なランク判定ロジック
+      let level = "BEGINNER";
+      let color = "var(--gray)";
+
+      if (correctCount === TOTAL_QUESTIONS) {
+        if (totalTime < 30) {
+          level = "AWS EXPERT";
+          color = "var(--neon-blue)";
+        } else if (totalTime < 60) {
+          level = "AWS PROFESSIONAL";
+          color = "var(--neon-blue)";
+        } else {
+          level = "AWS ASSOCIATE";
+          color = "var(--neon-green)";
+        }
+      } else if (correctCount >= 9) {
+        if (totalTime < 60) {
+          level = "AWS PROFESSIONAL";
+          color = "var(--neon-blue)";
+        } else {
+          level = "AWS ASSOCIATE";
+          color = "var(--neon-green)";
+        }
+      } else if (correctCount >= 8) {
+        if (totalTime < 90) {
+          level = "AWS ASSOCIATE";
+          color = "var(--neon-green)";
+        } else {
+          level = "AWS PRACTITIONER";
+          color = "var(--neon-green)";
+        }
+      } else if (correctCount >= 6) {
+        level = "AWS PRACTITIONER";
+        color = "var(--neon-green)";
+      }
+
+      const badge = document.getElementById('level-badge');
+      badge.textContent = level;
+      badge.style.color = color;
+      badge.style.borderColor = color;
+      badge.style.boxShadow = `0 0 15px ${color}`;
+
+      document.getElementById('res-score').textContent = `CORRECT ANSWERS: ${correctCount}/${TOTAL_QUESTIONS}`;
+      document.getElementById('res-time').textContent = `TOTAL TIME: ${totalTime.toFixed(1)} SECONDS`;
+    }
+
+    function restartToStart() {
+      switchScreen('screen-start');
+    }
+
+    // --- REVIEW SCREEN LOGIC ---
+    let reviewIdx = 0;
+
+    function startReview() {
+      reviewIdx = 0;
+      switchScreen('screen-review');
+      renderReviewQuestion();
+    }
+
+    function renderReviewQuestion() {
+      const q = questions[reviewIdx];
+      const userAns = userAnswers[reviewIdx];
+
+      document.getElementById('rev-q-num').textContent = `QUESTION ${reviewIdx + 1}/${TOTAL_QUESTIONS}`;
+      document.getElementById('rev-service-name').textContent = q.service.name;
+      document.getElementById('rev-icon').src = `icons/${q.service.icon}`;
+      document.getElementById('rev-desc').textContent = q.service.description;
+
+      const userAnsEl = document.getElementById('rev-user-ans');
+      const correctAnsEl = document.getElementById('rev-correct-ans');
+
+      if (userAns === q.correctOption) {
+        userAnsEl.textContent = "YOUR ANSWER: CORRECT!";
+        userAnsEl.style.color = "var(--neon-green)";
+        correctAnsEl.style.display = "none";
+      } else {
+        userAnsEl.textContent = `YOUR ANSWER: ${q.options[userAns]} (INCORRECT)`;
+        userAnsEl.style.color = "var(--neon-pink)";
+        correctAnsEl.style.display = "block";
+        correctAnsEl.textContent = `CORRECT ANSWER: ${q.options[q.correctOption]}`;
+      }
+
+      document.getElementById('btn-prev').disabled = (reviewIdx === 0);
+      document.getElementById('btn-next').disabled = (reviewIdx === TOTAL_QUESTIONS - 1);
+      document.getElementById('btn-prev').style.opacity = (reviewIdx === 0) ? "0.4" : "1";
+      document.getElementById('btn-next').style.opacity = (reviewIdx === TOTAL_QUESTIONS - 1) ? "0.4" : "1";
+    }
+
+    function prevReview() {
+      if (reviewIdx > 0) {
+        reviewIdx--;
+        renderReviewQuestion();
+      }
+    }
+
+    function nextReview() {
+      if (reviewIdx < TOTAL_QUESTIONS - 1) {
+        reviewIdx++;
+        renderReviewQuestion();
+      }
+    }
+
+    function backToResults() {
+      switchScreen('screen-result');
+    }
+
+    // サイバーパンク・グリッチ演出（5%の確率でランダム線を描画）
+    setInterval(() => {
+      const glitch = document.getElementById('glitch');
+      if (Math.random() < 0.08) {
+        glitch.style.display = 'block';
+        glitch.style.top = `${Math.random() * window.innerHeight}px`;
+        glitch.style.left = `${Math.random() * window.innerWidth * 0.7}px`;
+        glitch.style.width = `${Math.random() * 200 + 40}px`;
+        glitch.style.height = `${Math.random() * 4 + 2}px`;
+        setTimeout(() => { glitch.style.display = 'none'; }, 60);
+      }
+    }, 150);
+  </script>
+</body>
+</html>
