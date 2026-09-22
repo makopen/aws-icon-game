@@ -37,7 +37,6 @@
       overflow-x: hidden;
     }
 
-    /* Cyberpunk Grid Background */
     .bg-grid {
       position: fixed;
       top: 0;
@@ -52,7 +51,6 @@
       z-index: 0;
     }
 
-    /* Random Glitch Overlay */
     .glitch-bar {
       position: fixed;
       background: var(--neon-pink);
@@ -79,7 +77,6 @@
       justify-content: space-between;
     }
 
-    /* Cyberpunk Card Corner Cuts */
     .corner-dec {
       position: absolute;
       width: 20px;
@@ -93,7 +90,6 @@
     .corner-bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; }
     .corner-br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
 
-    /* Typography & Glows */
     h1 {
       font-size: 2.2rem;
       color: var(--neon-pink);
@@ -125,7 +121,6 @@
       display: none !important;
     }
 
-    /* Buttons */
     .btn-cyber {
       background: var(--neon-pink);
       color: var(--black);
@@ -157,7 +152,6 @@
       box-shadow: 0 0 12px var(--neon-green);
     }
 
-    /* Question Screen */
     .progress-bar-wrap {
       width: 400px;
       max-width: 80%;
@@ -177,7 +171,7 @@
       transition: width 0.3s ease;
     }
 
-    /* Icon reveal container */
+    /* アイコンコンテナ */
     .icon-container {
       width: 128px;
       height: 128px;
@@ -196,6 +190,7 @@
       display: block;
     }
 
+    /* 黒いカーテン（下へ縮むことでアイコンを上から開示） */
     .icon-curtain {
       position: absolute;
       bottom: 0;
@@ -231,7 +226,6 @@
       box-shadow: 0 0 10px var(--neon-green);
     }
 
-    /* Results */
     .badge {
       border: 2px solid;
       padding: 10px 30px;
@@ -250,7 +244,6 @@
       letter-spacing: 1px;
     }
 
-    /* Review Screen */
     .review-desc {
       color: var(--neon-green);
       font-size: 1.05rem;
@@ -366,7 +359,6 @@
   </div>
 
   <script>
-    // Pythonコードの aws_services と完全一致
     const AWS_SERVICES = [
       {"name": "Amazon EC2", "icon": "ec2.png", "description": "Virtual servers in the cloud"},
       {"name": "Amazon S3", "icon": "s3.png", "description": "Scalable storage in the cloud"},
@@ -401,6 +393,8 @@
     ];
 
     const TOTAL_QUESTIONS = 10;
+    const REVEAL_DURATION_SEC = 5.5; // 画像が上から完全に開示されるまでの秒数（約5.5秒）
+
     let questions = [];
     let userAnswers = [];
     let currentQuestionIdx = 0;
@@ -408,8 +402,8 @@
     let startTime = 0;
     let totalTime = 0;
 
-    let revealInterval = null;
-    let currentRevealPercent = 0;
+    let revealAnimationId = null;
+    let questionStartTime = 0;
 
     function shuffle(arr) {
       return [...arr].sort(() => Math.random() - 0.5);
@@ -420,7 +414,18 @@
       document.getElementById(screenId).classList.remove('hidden');
     }
 
-    function startGame() {
+    // 全画像の事前キャッシュ（途中で画像がパッと切り替わるのを防ぐ）
+    function preloadImage(url) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.src = url;
+        img.onload = () => resolve(url);
+        img.onerror = () => resolve(url);
+      });
+    }
+
+    async function startGame() {
+      // 10問ランダム抽出
       const selected = shuffle(AWS_SERVICES).slice(0, TOTAL_QUESTIONS);
       questions = selected.map(service => {
         const others = AWS_SERVICES.filter(s => s.name !== service.name).map(s => s.name);
@@ -439,32 +444,26 @@
       startTime = performance.now();
 
       switchScreen('screen-play');
-      loadQuestion();
+      await loadQuestion();
     }
 
-    function loadQuestion() {
-      clearInterval(revealInterval);
+    async function loadQuestion() {
+      // 実行中のアニメーションフレームを確実に停止
+      if (revealAnimationId) {
+        cancelAnimationFrame(revealAnimationId);
+        revealAnimationId = null;
+      }
 
       const q = questions[currentQuestionIdx];
-      document.getElementById('q-header').textContent = `QUESTION ${currentQuestionIdx + 1}/${TOTAL_QUESTIONS}`;
-      document.getElementById('progress-bar').style.width = `${(currentQuestionIdx / TOTAL_QUESTIONS) * 100}%`;
+      const iconUrl = `icons/${q.service.icon}`;
 
-      const quizIcon = document.getElementById('quiz-icon');
-      quizIcon.src = `icons/${q.service.icon}`;
-
-      // アイコンを上から下へ徐々に開示するアニメーション（REVEAL_STEPS再現）
-      currentRevealPercent = 100;
+      // カーテンを即座に100%（全隠し）にし、前の画像が見えないようにする
       const curtain = document.getElementById('icon-curtain');
       curtain.style.height = '100%';
 
-      revealInterval = setInterval(() => {
-        currentRevealPercent -= 2.5; // 約1.2秒かけて下まで公開
-        if (currentRevealPercent <= 0) {
-          currentRevealPercent = 0;
-          clearInterval(revealInterval);
-        }
-        curtain.style.height = `${currentRevealPercent}%`;
-      }, 30);
+      // ヘッダー・プログレスバー更新
+      document.getElementById('q-header').textContent = `QUESTION ${currentQuestionIdx + 1}/${TOTAL_QUESTIONS}`;
+      document.getElementById('progress-bar').style.width = `${(currentQuestionIdx / TOTAL_QUESTIONS) * 100}%`;
 
       // 選択肢ボタン生成
       const wrap = document.getElementById('options-wrap');
@@ -476,10 +475,38 @@
         btn.onclick = () => selectOption(idx);
         wrap.appendChild(btn);
       });
+
+      // 画像の読み込み完了を待ってからsrcにセット（チラつき・切り替わり防止）
+      await preloadImage(iconUrl);
+      const quizIcon = document.getElementById('quiz-icon');
+      quizIcon.src = iconUrl;
+
+      // requestAnimationFrame で滑らかに徐々に開示
+      questionStartTime = performance.now();
+
+      function stepReveal(now) {
+        const elapsed = (now - questionStartTime) / 1000;
+        const progress = Math.min(1, elapsed / REVEAL_DURATION_SEC);
+        const remainingPercent = (1 - progress) * 100;
+
+        curtain.style.height = `${remainingPercent}%`;
+
+        if (progress < 1) {
+          revealAnimationId = requestAnimationFrame(stepReveal);
+        } else {
+          curtain.style.height = '0%';
+          revealAnimationId = null;
+        }
+      }
+
+      revealAnimationId = requestAnimationFrame(stepReveal);
     }
 
     function selectOption(selectedIdx) {
-      clearInterval(revealInterval);
+      if (revealAnimationId) {
+        cancelAnimationFrame(revealAnimationId);
+        revealAnimationId = null;
+      }
 
       const q = questions[currentQuestionIdx];
       userAnswers.push(selectedIdx);
@@ -500,7 +527,6 @@
       totalTime = (performance.now() - startTime) / 1000;
       switchScreen('screen-result');
 
-      // Pythonコードの厳格なランク判定ロジック
       let level = "BEGINNER";
       let color = "var(--gray)";
 
@@ -606,7 +632,7 @@
       switchScreen('screen-result');
     }
 
-    // サイバーパンク・グリッチ演出（5%の確率でランダム線を描画）
+    // サイバーパンク・グリッチ演出
     setInterval(() => {
       const glitch = document.getElementById('glitch');
       if (Math.random() < 0.08) {
